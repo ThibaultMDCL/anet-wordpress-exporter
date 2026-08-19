@@ -4,26 +4,54 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 )
 
-func (c *WordpressCollector) FetchJSONFromEndpoint(APIEndpoint string) []byte {
+// TODO: rename ces nom d'objet instacié il faisait quoi ce dev ????
+
+func (c *WordpressCollector) FetchJSONFromEndpoint(APIEndpoint string) ([]byte, error) {
 	APIBase := c.Wp.MonitoredWordpress
 	HTTPClient := &http.Client{}
 	fetchURL := fmt.Sprintf("%s%s", APIBase, APIEndpoint)
 	fmt.Println(fetchURL)
-	request, err := http.NewRequest("GET", fetchURL, nil)
-	request.Header.Set("User-Agent", c.Wp.UserAgent)
-	ErrCheck(err)
-	if c.Wp.Auth.Use {
-		request.SetBasicAuth(c.Wp.Auth.Username, c.Wp.Auth.Password)
+
+	request, err := http.NewRequest(http.MethodGet, fetchURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
 	}
+
+	request.Header.Set("User-Agent", c.Wp.UserAgent)
+
+	if c.Wp.Auth.Use {
+		request.SetBasicAuth(
+			c.Wp.Auth.Username,
+			c.Wp.Auth.Password,
+		)
+	}
+
 	response, err := HTTPClient.Do(request)
-	ErrCheck(err)
-	data, _ := ioutil.ReadAll(response.Body)
-	return data
+	if err != nil {
+		return nil, fmt.Errorf("request %s: %w", fetchURL, err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK ||
+		response.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf(
+			"request %s returned HTTP status %d",
+			fetchURL,
+			response.StatusCode,
+		)
+	}
+
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
+	}
+
+	return data, nil
 }
 
 // count items returned in JSON and return length
@@ -46,7 +74,6 @@ func BasicAuth(username, password string) string {
 	authString := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(authString))
 }
-
 
 func ErrCheck(e error) {
 	if e != nil {

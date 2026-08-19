@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -17,9 +18,8 @@ type WordpressCollector struct {
 	taxonomies *prometheus.Desc
 	themes     *prometheus.Desc
 	plugins    *prometheus.Desc
-	Wp		 *Wordpress
+	Wp         *Wordpress
 }
-
 
 func (c *WordpressCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.posts
@@ -34,30 +34,70 @@ func (c *WordpressCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.plugins
 }
 
+func fetchErrCheck(err error, cat string) bool {
+	if err != nil {
+		log.Printf("unable to fetch  %s: %v, ", cat, err)
+		return false
+	}
+	return true
+}
 
 func (c *WordpressCollector) Collect(ch chan<- prometheus.Metric) {
 	var err error
+	var data []byte
 
-	c.Wp.categories, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/categories"))
-	ErrCheck(err)
-	c.Wp.posts, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/posts"))
-	ErrCheck(err)
-	c.Wp.tags, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/tags"))
-	ErrCheck(err)
-	c.Wp.pages, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/pages"))
-	ErrCheck(err)
-	c.Wp.comments, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/comments"))
-	ErrCheck(err)
-	c.Wp.media, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/media"))
-	ErrCheck(err)
-	c.Wp.users, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/users"))
-	ErrCheck(err)
-	c.Wp.taxonomies, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/taxonomies"))
-	ErrCheck(err)
-	c.Wp.themes, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/themes"))
-	ErrCheck(err)
-	c.Wp.plugins, err = CountJSONItems(c.FetchJSONFromEndpoint("/wp-json/wp/v2/plugins"))
-	ErrCheck(err)
+	// TODO : transformer ca par un ernorme foreach et une belle liste pour le scalinggg
+
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/categories")
+	if fetchErrCheck(err, "categories") {
+		c.Wp.categories, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/posts")
+	if fetchErrCheck(err, "posts") {
+		c.Wp.posts, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/tags")
+	if fetchErrCheck(err, "tags") {
+		c.Wp.tags, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/pages")
+	if fetchErrCheck(err, "pages") {
+		c.Wp.pages, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/comments")
+	if fetchErrCheck(err, "comments") {
+		c.Wp.comments, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/media")
+	if fetchErrCheck(err, "media") {
+		c.Wp.media, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/users")
+	if fetchErrCheck(err, "users") {
+		c.Wp.users, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/taxonomies")
+	if fetchErrCheck(err, "taxonomies") {
+		c.Wp.taxonomies, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/themes")
+	if fetchErrCheck(err, "themes") {
+		c.Wp.themes, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
+	data, err = c.FetchJSONFromEndpoint("/wp-json/wp/v2/plugins")
+	if fetchErrCheck(err, "plugins") {
+		c.Wp.plugins, err = CountJSONItems(data)
+		ErrCheck(err)
+	}
 
 	ch <- prometheus.MustNewConstMetric(c.categories, prometheus.GaugeValue, float64(c.Wp.categories))
 	ch <- prometheus.MustNewConstMetric(c.posts, prometheus.GaugeValue, float64(c.Wp.posts))
@@ -77,7 +117,7 @@ func NewWordpressCollector(w *Wordpress) *WordpressCollector {
 	fmt.Printf("NewWordpressCollector:\nSite: %v\nUse auth: %v\n", w.MonitoredWordpress, w.Auth.Use)
 
 	return &WordpressCollector{
-		Wp:  w,
+		Wp:         w,
 		posts:      prometheus.NewDesc("wordpress_post_count", "WordPress posts count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
 		categories: prometheus.NewDesc("wordpress_category_count", "WordPress category count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
 		tags:       prometheus.NewDesc("wordpress_tag_count", "WordPress tags count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
@@ -90,5 +130,3 @@ func NewWordpressCollector(w *Wordpress) *WordpressCollector {
 		plugins:    prometheus.NewDesc("wordpress_plugin_count", "Wordpress plugin count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
 	}
 }
-
-
