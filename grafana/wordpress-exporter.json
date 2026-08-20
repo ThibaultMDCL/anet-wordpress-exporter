@@ -491,8 +491,8 @@
                 "allValue": null,
                 "current": {
                     "selected": true,
-                    "text": "https://aorfanos.com",
-                    "value": "https://aorfanos.com"
+                    "text": "test",
+                    "value": "https://test.com"
                 },
                 "datasource": null,
                 "definition": "label_values(exported_instance)",
