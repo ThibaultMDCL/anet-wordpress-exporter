@@ -23,45 +23,52 @@ var (
 	useAuth          = flag.Bool("auth.basic", true, "Whether to use basic authentication (true|false)")
 	authUsername     = flag.String("auth.user", "admin", "User to use with basic auth")
 	authPassword     = flag.String("auth.pass", "admin", "Password to use with basic auth")
-	monitoredHost    string
 )
 
 func init() {
 	flag.Parse()
 
-	monitorHost := *monitorWordPress
-	monitorUsername := *authUsername
-	monitorPassword := *authPassword
-	monitorUseAuth := *useAuth
+	if *configFile == "" {
+		wp := utils.NewWordpress(
+			"standalone",
+			*monitorWordPress,
+			UserAgent,
+			*authUsername,
+			*authPassword,
+			*useAuth,
+		)
 
-	if *configFile != "" {
-		config, err := utils.LoadConfig(*configFile)
-		if err != nil {
-			log.Fatalf("unable to load configuration: %v", err)
-		}
-
-		target := config.WordPresses[0]
-
-		monitorHost = target.URL
-		monitorUsername = target.Username
-		monitorPassword = target.ApplicationPassword
-		monitorUseAuth = true
+		prometheus.MustRegister(utils.NewWordpressCollector(wp))
+		return
 	}
 
-	wp := utils.NewWordpress(
-		monitorHost,
-		UserAgent,
-		monitorUsername,
-		monitorPassword,
-		monitorUseAuth,
-	)
-	monitoredHost = monitorHost
-	prometheus.MustRegister(utils.NewWordpressCollector(wp))
+	config, err := utils.LoadConfig(*configFile)
+	if err != nil {
+		log.Fatalf("unable to load configuration: %v", err)
+	}
+
+	for _, target := range config.WordPresses {
+		if !target.IsEnabled() {
+			continue
+		}
+
+		wp := utils.NewWordpress(
+			target.Name,
+			target.URL,
+			UserAgent,
+			target.Username,
+			target.ApplicationPassword,
+			true,
+		)
+
+		prometheus.MustRegister(utils.NewWordpressCollector(wp))
+		log.Printf("configured WordPress target: %s (%s)", target.Name, target.URL)
+	}
 }
 
 func main() {
 
 	http.Handle("/metrics", promhttp.Handler())
-	fmt.Printf("Started WordPress exporter for %s\n", monitoredHost)
+	fmt.Printf("Started WordPress exporter on port %d\n", *portNum)
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*portNum), nil))
 }

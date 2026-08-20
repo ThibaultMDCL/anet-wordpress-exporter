@@ -15,6 +15,7 @@ type WordpressCollector struct {
 	comments   *prometheus.Desc
 	media      *prometheus.Desc
 	users      *prometheus.Desc
+	adminUsers *prometheus.Desc
 	taxonomies *prometheus.Desc
 	themes     *prometheus.Desc
 	plugins    *prometheus.Desc
@@ -29,6 +30,7 @@ func (c *WordpressCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.comments
 	ch <- c.media
 	ch <- c.users
+	ch <- c.adminUsers
 	ch <- c.taxonomies
 	ch <- c.themes
 	ch <- c.plugins
@@ -99,6 +101,11 @@ func (c *WordpressCollector) Collect(ch chan<- prometheus.Metric) {
 		ErrCheck(err)
 	}
 
+	adminUsers, err := c.FetchTotalFromEndpoint("/wp-json/wp/v2/users?roles=administrator&per_page=1")
+	if fetchErrCheck(err, "admin users") {
+		c.Wp.adminUsers = adminUsers
+	}
+
 	ch <- prometheus.MustNewConstMetric(c.categories, prometheus.GaugeValue, float64(c.Wp.categories))
 	ch <- prometheus.MustNewConstMetric(c.posts, prometheus.GaugeValue, float64(c.Wp.posts))
 	ch <- prometheus.MustNewConstMetric(c.tags, prometheus.GaugeValue, float64(c.Wp.tags))
@@ -106,6 +113,7 @@ func (c *WordpressCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(c.comments, prometheus.GaugeValue, float64(c.Wp.comments))
 	ch <- prometheus.MustNewConstMetric(c.media, prometheus.GaugeValue, float64(c.Wp.media))
 	ch <- prometheus.MustNewConstMetric(c.users, prometheus.GaugeValue, float64(c.Wp.users))
+	ch <- prometheus.MustNewConstMetric(c.adminUsers, prometheus.GaugeValue, float64(c.Wp.adminUsers))
 	ch <- prometheus.MustNewConstMetric(c.taxonomies, prometheus.GaugeValue, float64(c.Wp.taxonomies))
 	ch <- prometheus.MustNewConstMetric(c.themes, prometheus.GaugeValue, float64(c.Wp.themes))
 	ch <- prometheus.MustNewConstMetric(c.plugins, prometheus.GaugeValue, float64(c.Wp.plugins))
@@ -118,15 +126,16 @@ func NewWordpressCollector(w *Wordpress) *WordpressCollector {
 
 	return &WordpressCollector{
 		Wp:         w,
-		posts:      prometheus.NewDesc("wordpress_post_count", "WordPress posts count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
-		categories: prometheus.NewDesc("wordpress_category_count", "WordPress category count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
-		tags:       prometheus.NewDesc("wordpress_tag_count", "WordPress tags count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
-		pages:      prometheus.NewDesc("wordpress_page_count", "WordPress pages count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
-		comments:   prometheus.NewDesc("wordpress_comment_count", "WordPress comments count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
-		media:      prometheus.NewDesc("wordpress_media_count", "WordPress media files count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
-		users:      prometheus.NewDesc("wordpress_user_count", "WordPress users count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
-		taxonomies: prometheus.NewDesc("wordpress_taxonomies_count", "WordPress taxonomy count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
-		themes:     prometheus.NewDesc("wordpress_theme_count", "WordPress theme count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
-		plugins:    prometheus.NewDesc("wordpress_plugin_count", "Wordpress plugin count", nil, prometheus.Labels{"instance": w.MonitoredWordpress}),
+		posts:      prometheus.NewDesc("wordpress_post_count", "WordPress posts count", nil, prometheus.Labels{"site": w.Name}),
+		categories: prometheus.NewDesc("wordpress_category_count", "WordPress category count", nil, prometheus.Labels{"site": w.Name}),
+		tags:       prometheus.NewDesc("wordpress_tag_count", "WordPress tags count", nil, prometheus.Labels{"site": w.Name}),
+		pages:      prometheus.NewDesc("wordpress_page_count", "WordPress pages count", nil, prometheus.Labels{"site": w.Name}),
+		comments:   prometheus.NewDesc("wordpress_comment_count", "WordPress comments count", nil, prometheus.Labels{"site": w.Name}),
+		media:      prometheus.NewDesc("wordpress_media_count", "WordPress media files count", nil, prometheus.Labels{"site": w.Name}),
+		users:      prometheus.NewDesc("wordpress_user_count", "WordPress users count", nil, prometheus.Labels{"site": w.Name}),
+		adminUsers: prometheus.NewDesc("wordpress_admin_user_count", "WordPress administrator user count", nil, prometheus.Labels{"site": w.Name}),
+		taxonomies: prometheus.NewDesc("wordpress_taxonomies_count", "WordPress taxonomy count", nil, prometheus.Labels{"site": w.Name}),
+		themes:     prometheus.NewDesc("wordpress_theme_count", "WordPress theme count", nil, prometheus.Labels{"site": w.Name}),
+		plugins:    prometheus.NewDesc("wordpress_plugin_count", "Wordpress plugin count", nil, prometheus.Labels{"site": w.Name}),
 	}
 }

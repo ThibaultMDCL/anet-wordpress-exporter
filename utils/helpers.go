@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 // TODO: rename ces nom d'objet instacié il faisait quoi ce dev ????
@@ -52,6 +53,61 @@ func (c *WordpressCollector) FetchJSONFromEndpoint(APIEndpoint string) ([]byte, 
 	}
 
 	return data, nil
+}
+
+func (c *WordpressCollector) FetchTotalFromEndpoint(APIEndpoint string) (int, error) {
+	APIBase := c.Wp.MonitoredWordpress
+	HTTPClient := &http.Client{}
+	fetchURL := fmt.Sprintf("%s%s", APIBase, APIEndpoint)
+
+	request, err := http.NewRequest(http.MethodGet, fetchURL, nil)
+	if err != nil {
+		return 0, fmt.Errorf("create request: %w", err)
+	}
+
+	request.Header.Set("User-Agent", c.Wp.UserAgent)
+
+	if c.Wp.Auth.Use {
+		request.SetBasicAuth(
+			c.Wp.Auth.Username,
+			c.Wp.Auth.Password,
+		)
+	}
+
+	response, err := HTTPClient.Do(request)
+	if err != nil {
+		return 0, fmt.Errorf("request %s: %w", fetchURL, err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK ||
+		response.StatusCode >= http.StatusMultipleChoices {
+		return 0, fmt.Errorf(
+			"request %s returned HTTP status %d",
+			fetchURL,
+			response.StatusCode,
+		)
+	}
+
+	total := response.Header.Get("X-WP-Total")
+	if total == "" {
+		return 0, fmt.Errorf(
+			"request %s: missing X-WP-Total response header",
+			fetchURL,
+		)
+	}
+
+	count, err := strconv.Atoi(total)
+	if err != nil {
+		return 0, fmt.Errorf(
+			"request %s: invalid X-WP-Total value %q: %w",
+			fetchURL,
+			total,
+			err,
+		)
+	}
+
+	return count, nil
 }
 
 // count items returned in JSON and return length
